@@ -6,9 +6,11 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "graphviz>=0.21",
+    "manim>=0.19.1",
     "matplotlib>=3.10.8",
     "networkx>=3.6.1",
     "numpy>=2.4.0",
+    "scipy>=1.16.3",
     "sympy>=1.14.0",
     "tensorflow>=2.20.0",
     "torch>=2.9.1",
