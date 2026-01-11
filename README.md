@@ -1,5 +1,13 @@
 # Optimizer Race – Autograd et Visualisation avec Manim
 
+## Membres du groupe
+- alexis.petignat
+- andy.shan
+- lois.breant
+- matthew.banawa
+- max.nagaishi
+- oscar.le-dauphin
+
 ## 1. Objectif du projet
 
 Ce projet a pour objectif de :
