@@ -1,86 +1,10 @@
 import numpy as np
 from manim import *
 import math
+import os
+from surfaces import get_surface
+from tensor import Tensor, sin_d, cos_d, exp_d
 
-class Tensor:
-    def __init__(self, data, _children=(), _op=''):
-        self.data = float(data)
-        self.grad = 0.0
-        self._backward = lambda: None
-        self._prev = set(_children)
-        self._op = _op
-
-    def __add__(self, other):
-        other = other if isinstance(other, Tensor) else Tensor(other)
-        out = Tensor(self.data + other.data, (self, other), '+')
-        def _backward():
-            self.grad += out.grad
-            other.grad += out.grad
-        out._backward = _backward
-        return out
-
-    def __mul__(self, other):
-        other = other if isinstance(other, Tensor) else Tensor(other)
-        out = Tensor(self.data * other.data, (self, other), '*')
-        def _backward():
-            self.grad += other.data * out.grad
-            other.grad += self.data * out.grad
-        out._backward = _backward
-        return out
-
-    def __pow__(self, other):
-        assert isinstance(other, (int, float))
-        out = Tensor(self.data**other, (self,), f'**{other}')
-        def _backward():
-            self.grad += (other * self.data**(other-1)) * out.grad
-        out._backward = _backward
-        return out
-
-    def __neg__(self): return self * -1
-    def __radd__(self, other): return self + other
-    def __sub__(self, other): return self + (-other)
-    def __rsub__(self, other): return other + (-self)
-    def __rmul__(self, other): return self * other
-    def __truediv__(self, other): return self * other**-1
-    def __rtruediv__(self, other): return other * self**-1
-
-    def backward(self):
-        topo = []
-        visited = set()
-        def build_topo(v):
-            if v not in visited:
-                visited.add(v)
-                for child in v._prev:
-                    build_topo(child)
-                topo.append(v)
-        build_topo(self)
-        self.grad = 1.0
-        for v in reversed(topo):
-            v._backward()
-
-    def __repr__(self):
-        return f"Tensor(data={self.data:.4f}, grad={self.grad:.4f})"
-
-def sin_d(x):
-    out = Tensor(np.sin(x.data), (x,), 'sin')
-    def _backward():
-        x.grad += np.cos(x.data) * out.grad
-    out._backward = _backward
-    return out
-
-def cos_d(x):
-    out = Tensor(np.cos(x.data), (x,), 'cos')
-    def _backward():
-        x.grad += -np.sin(x.data) * out.grad
-    out._backward = _backward
-    return out
-
-def exp_d(x):
-    out = Tensor(np.exp(x.data), (x,), 'exp')
-    def _backward():
-        x.grad += out.data * out.grad
-    out._backward = _backward
-    return out
 
 class Optimizer:
     def __init__(self, params):
@@ -141,36 +65,24 @@ class Adam(Optimizer):
 
 class OptimizerRace(ThreeDScene):
     def construct(self):
-        self.set_camera_orientation(phi=60 * DEGREES, theta=-80 * DEGREES, zoom=1.5)
+        surface_name = os.environ.get('SURFACE', 'funky')
+        surf = get_surface(surface_name)
         
-        u_range = [0, 1.2]
-        v_range = [0, 1.2]
-
-        def funky_func_numpy(u, v):
-            val = 0.3 * (
-                5 * u * v * (1 - u) * (1 - v) * np.cos(10 * v) * np.sin(10 * u * v) * np.exp(u)
-                + np.exp(-((v - 0.4) ** 2 + (u - 0.2) ** 2) / 0.03)
-                + 0.6 * np.exp(-((v - 0.4) ** 2) / 0.03) * np.sin(25*u) * (1-u)**2
-                + 1.4 * np.exp(-(v - 0.6)**2 / 0.02) * (np.exp(-(u-0.7)**2 / 0.02) - np.exp(-(u-0.4)**2 / 0.02))
-            )
-            return val
-
-        def funky_func_tensor(u, v):
-            term1 = Tensor(5) * u * v * (1 - u) * (1 - v) * cos_d(Tensor(10) * v) * sin_d(Tensor(10) * u * v) * exp_d(u)
-            term2 = exp_d(-((v - 0.4) ** 2 + (u - 0.2) ** 2) / 0.03)
-            term3 = Tensor(0.6) * exp_d(-((v - 0.4) ** 2) / 0.03) * sin_d(Tensor(25)*u) * (1-u)**2
-            term4 = Tensor(1.4) * exp_d(-(v - 0.6)**2 / 0.02) * (exp_d(-(u-0.7)**2 / 0.02) - exp_d(-(u-0.4)**2 / 0.02))
-            return Tensor(0.3) * (term1 + term2 + term3 + term4)
+        # Set camera orientation based on surface
+        self.set_camera_orientation(phi=surf.camera_phi * DEGREES, theta=surf.camera_theta * DEGREES, zoom=1.5)
+        
+        u_range = surf.u_range
+        v_range = surf.v_range
 
         axes = ThreeDAxes(
             x_range=[u_range[0], u_range[1], 0.1],
             y_range=[v_range[0], v_range[1], 0.1],
-            z_range=[-1, 1, 0.5],
+            z_range=[surf.z_range[0], surf.z_range[1], 0.5],
             x_length=7, y_length=7, z_length=4
         ).shift(DOWN*1 + LEFT*0)
 
         surface = Surface(
-            lambda u, v: axes.c2p(u, v, funky_func_numpy(u, v)),
+            lambda u, v: axes.c2p(u, v, surf.func_numpy(u, v)),
             u_range=u_range,
             v_range=v_range,
             resolution=(64, 64),
@@ -183,7 +95,7 @@ class OptimizerRace(ThreeDScene):
         self.play(Create(axes), Create(surface))
         self.wait(1)
 
-        start_u, start_v = 0.1, 0.45 
+        start_u, start_v = surf.start_u, surf.start_v
         iterations = 120 
 
         competitors = [
@@ -194,6 +106,7 @@ class OptimizerRace(ThreeDScene):
         ]
 
         all_paths_group = VGroup()
+        stats_data = []
 
         for comp in competitors:
             u_t = Tensor(start_u)
@@ -202,16 +115,54 @@ class OptimizerRace(ThreeDScene):
             optimizer = comp["opt_class"]([u_t, v_t], learning_rate=comp["lr"], **kwargs)
             path_points = []
             
-            for _ in range(iterations):
+            # Statistics tracking
+            loss_values = []
+            distances = []
+            start_pos = np.array([start_u, start_v])
+            
+            for iter_num in range(iterations):
                 curr_u = max(u_range[0], min(u_range[1], u_t.data))
                 curr_v = max(v_range[0], min(v_range[1], v_t.data))
-                curr_z = funky_func_numpy(curr_u, curr_v)
+                curr_z = surf.func_numpy(curr_u, curr_v)
                 path_points.append(axes.c2p(curr_u, curr_v, curr_z))
                 
+                # Track statistics
+                loss_values.append(curr_z)
+                curr_pos = np.array([curr_u, curr_v])
+                distances.append(np.linalg.norm(curr_pos - start_pos))
+                
                 optimizer.zero_grad()
-                loss = funky_func_tensor(u_t, v_t)
+                loss = surf.func_tensor(u_t, v_t)
                 loss.backward()
                 optimizer.step()
+            
+            # Calculate final statistics
+            final_loss = loss_values[-1]
+            total_distance = sum([
+                np.linalg.norm(np.array([path_points[i+1][0], path_points[i+1][1]]) - 
+                              np.array([path_points[i][0], path_points[i][1]]))
+                for i in range(len(path_points)-1)
+            ])
+            improvement = ((loss_values[0] - final_loss) / loss_values[0] * 100) if loss_values[0] != 0 else 0
+            
+            # Find convergence iteration (when loss stops improving significantly)
+            convergence_iter = iterations
+            threshold = 0.001
+            for i in range(1, len(loss_values)):
+                if abs(loss_values[i] - loss_values[i-1]) < threshold:
+                    convergence_iter = i
+                    break
+            
+            stats_data.append({
+                "name": comp["name"],
+                "color": comp["color"],
+                "final_loss": final_loss,
+                "total_distance": total_distance,
+                "improvement": improvement,
+                "convergence_iter": convergence_iter
+            })
+            
+            comp["stats"] = stats_data[-1]
 
             title = Text(comp["name"], font_size=48, color=comp["color"])
             title.to_corner(UL)
@@ -243,21 +194,34 @@ class OptimizerRace(ThreeDScene):
 
         self.wait(1)
         
-        legend = VGroup()
-        legend_title = Text("Final diff", font_size=36).to_corner(UL).shift(DOWN*0.5)
-        self.add_fixed_in_frame_mobjects(legend_title)
+        # Create statistics display - more compact vertical layout
+        stats_title = Text("Stats", font_size=24, weight=BOLD).to_corner(UL).shift(DOWN*0.15 + RIGHT*0.1)
+        self.add_fixed_in_frame_mobjects(stats_title)
         
-        for i, comp in enumerate(competitors):
-            l = Text(comp["name"], color=comp["color"], font_size=24)
-            legend.add(l)
+        stats_group = VGroup()
+        for i, stat in enumerate(stats_data):
+            # Name and all stats on separate lines for compactness
+            name_text = Text(stat["name"], color=stat["color"], font_size=16, weight=BOLD)
+            stats_text = Text(
+                f"Loss: {stat['final_loss']:.3f} Dist: {stat['total_distance']:.1f}\nImprove: {stat['improvement']:.0f}% Conv: {stat['convergence_iter']}", 
+                font_size=12,
+                line_spacing=0.8
+            )
+            
+            # Stack vertically
+            opt_group = VGroup(name_text, stats_text)
+            opt_group.arrange(DOWN, buff=0.05, aligned_edge=LEFT)
+            stats_group.add(opt_group)
         
-        legend.arrange(DOWN, aligned_edge=LEFT)
-        legend.next_to(legend_title, DOWN)
-        self.add_fixed_in_frame_mobjects(legend)
+        stats_group.arrange(DOWN, aligned_edge=LEFT, buff=0.12)
+        stats_group.next_to(stats_title, DOWN, buff=0.15)
+        stats_group.scale(0.85)
+        self.add_fixed_in_frame_mobjects(stats_group)
         
+        # Show all paths together with statistics
         self.play(
-            FadeIn(legend_title),
-            FadeIn(legend),
+            FadeIn(stats_title),
+            FadeIn(stats_group),
             Create(all_paths_group),
             run_time=2
         )
