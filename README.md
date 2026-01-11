@@ -111,9 +111,11 @@ Visualisation
 Les résultats de l’expérience sont visibles dans les vidéos fournies avec le projet.  
 Ces vidéos montrent la surface de perte ainsi que les trajectoires des différents optimiseurs (SGD, Momentum, RMSProp et Adam) à partir du même point initial.
 
-<iframe width="560" height="315" src="https://drive.google.com/open?id=1-nzipeiaCw9xVdnwspxs_womyH8ILkxX&usp=drive_copy" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
-<iframe width="560" height="315" src="https://drive.google.com/open?id=1ZRvMQeuC3ML8ygzywbMeZiOTwbuUYpUW&usp=drive_copy" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
+https://github.com/user-attachments/assets/36c8a765-f737-44f5-b7a9-180b646e9e52
+
+
 
 Chaque vidéo affiche le déplacement des optimiseurs sur la surface z = f(u, v).
 
