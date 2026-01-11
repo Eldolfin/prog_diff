@@ -123,6 +123,10 @@ Ces vidéos montrent la surface de perte ainsi que les trajectoires des différe
 
 https://github.com/user-attachments/assets/36c8a765-f737-44f5-b7a9-180b646e9e52
 
+Avec une fonction plus complexe:
+
+https://github.com/user-attachments/assets/ceac99de-a746-4d20-8e30-83097c87531c
+
 
 
 Chaque vidéo affiche le déplacement des optimiseurs sur la surface z = f(u, v).
